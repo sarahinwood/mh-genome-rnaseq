@@ -20,16 +20,11 @@ remove_row_names <- c("N_unmapped", "N_multimapping", "N_noFeature", "N_ambiguou
 starCounts_final <- starCounts[!(row.names(starCounts) %in% remove_row_names), ]
 
 #read in files with sample names and all of conditions
-sample_data<- fread("data/full_sample_table.csv", header=TRUE)
+sample_data<- fread("data/sample_table.csv", header=TRUE)
 setkey(sample_data, sample_name)
 
 #Create dds object and link to sample data info- get table with counts- like table with sample names and treatments in a way Deseq undertands
 dds <-DESeqDataSetFromMatrix(countData=starCounts_final, colData = sample_data, design = ~1)
 colData(dds)
 
-#save dds as file
-saveRDS(dds, "output/deseq2/mh_dds_all.rds")
-
-##remove venom3 sample
-mh_dds_ven <- dds[,-c(18)]
-saveRDS(mh_dds_ven, "output/deseq2/mh_dds.rds")
+saveRDS(dds, "output/deseq2/mh_dds.rds")

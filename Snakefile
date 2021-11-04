@@ -34,7 +34,7 @@ rule target:
         'output/multiqc_filtermatch/multiqc_report.html',
         'output/star/star_pass2/Mh_venom3.ReadsPerGene.out.tab',
         expand('output/kraken_unmapped/reports/kraken_{sample}_report.txt', sample=all_samples),
-        expand('output/star_filtermatch/star_pass2/{sample}.ReadsPerGene.out.tab', sample=all_samples),
+        expand('output/star/star_pass2/{sample}.ReadsPerGene.out.tab', sample=all_samples),
         'output/Mh_annots.gtf',
         'output/star/star_reference/Genome',
         ##venom2 unmapped
@@ -250,16 +250,16 @@ rule star_second_pass:
     input:
         left = 'output/bbduk_trim/{sample}_r1.fq.gz',
         right = 'output/bbduk_trim/{sample}_r2.fq.gz',
-        junctions = expand('output/star_filtermatch/star_pass1/{sample}.SJ.out.tab', sample=all_samples)
+        junctions = expand('output/star/star_pass1/{sample}.SJ.out.tab', sample=all_samples)
     output:
         bam = 'output/star_filtermatch/star_pass2/{sample}.Aligned.sortedByCoord.out.bam',
-        reads_per_gene = 'output/star_filtermatch/star_pass2/{sample}.ReadsPerGene.out.tab',
-        unmapped = 'output/star_filtermatch/star_pass2/{sample}.Unmapped.out.mate1'
+        reads_per_gene = 'output/star/star_pass2/{sample}.ReadsPerGene.out.tab',
+        unmapped = 'output/star/star_pass2/{sample}.Unmapped.out.mate1'
     threads:
         20
     params:
         genome_dir = 'output/star/star_reference',
-        prefix = 'output/star_filtermatch/star_pass2/{sample}.'
+        prefix = 'output/star/star_pass2/{sample}.'
     log:
         'output/logs/star_filtermatch/star_pass2_{sample}.log'
     singularity:
@@ -269,8 +269,6 @@ rule star_second_pass:
         '--runThreadN {threads} '
         '--genomeDir {params.genome_dir} '
         '--sjdbFileChrStartEnd {input.junctions} '
-        '--outFilterScoreMinOverLread 0.5 '
-        '--outFilterMatchNminOverLread 0.5 '
         '--outSAMtype BAM SortedByCoordinate '
         '--outBAMcompression 10 '
         '--quantMode GeneCounts '
@@ -286,10 +284,10 @@ rule star_first_pass:
         right = 'output/bbduk_trim/{sample}_r2.fq.gz',
         star_reference = 'output/star/star_reference/Genome'
     output:
-        sjdb = 'output/star_filtermatch/star_pass1/{sample}.SJ.out.tab'
+        sjdb = 'output/star/star_pass1/{sample}.SJ.out.tab'
     params:
         genome_dir = 'output/star/star_reference',
-        prefix = 'output/star_filtermatch/star_pass1/{sample}.'
+        prefix = 'output/star/star_pass1/{sample}.'
     threads:
         20
     log:
@@ -301,8 +299,6 @@ rule star_first_pass:
         '--runThreadN {threads} '
         '--genomeDir {params.genome_dir} '
         '--outSJfilterReads Unique '
-        '--outFilterScoreMinOverLread 0.5 '
-        '--outFilterMatchNminOverLread 0.5 '
         '--outSAMtype None '
         '--readFilesIn {input.left} {input.right} '
         '--readFilesCommand zcat '
