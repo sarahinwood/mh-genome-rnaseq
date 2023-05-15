@@ -2,14 +2,14 @@ library(data.table)
 library(DESeq2)
 library(VennDiagram)
 
-mh_dds <- readRDS("output/deseq2/itWT/mh_itWT.rds")
+dds_tissue <- readRDS("output/deseq2/itWT/mh_itWT.rds")
 
 ###############################
 ## iterative pairwise comp.s ##
 ###############################
 
 ##venom head
-ov_head <- results(mh_dds, contrast=c("Tissue", "Ovaries", "Head"), alpha = 0.05, lfcThreshold = 1)
+ov_head <- results(dds_tissue, contrast=c("Tissue", "Ovaries", "Head"), alpha = 0.05, lfcThreshold = 1)
 summary(ov_head)
 ##Order based of padj
 ordered_ov_head <- ov_head[order(ov_head$padj),]
@@ -18,7 +18,7 @@ ordered_ov_head_table <- data.table(data.frame(ordered_ov_head), keep.rownames =
 head <- subset(ordered_ov_head_table, padj < 0.05)
 
 ##venom abdo
-ov_abdo <- results(mh_dds, contrast=c("Tissue", "Ovaries", "Abdomen"), alpha = 0.05, lfcThreshold = 1)
+ov_abdo <- results(dds_tissue, contrast=c("Tissue", "Ovaries", "Abdomen"), alpha = 0.05, lfcThreshold = 1)
 summary(ov_abdo)
 ##Order based of padj
 ordered_ov_abdo <- ov_abdo[order(ov_abdo$padj),]
@@ -27,7 +27,7 @@ ordered_ov_abdo_table <- data.table(data.frame(ordered_ov_abdo), keep.rownames =
 abdo <- subset(ordered_ov_abdo_table, padj < 0.05)
 
 ##venom thorax
-ov_thorax <- results(mh_dds, contrast=c("Tissue", "Ovaries", "Thorax"), alpha = 0.05, lfcThreshold = 1)
+ov_thorax <- results(dds_tissue, contrast=c("Tissue", "Ovaries", "Thorax"), alpha = 0.05, lfcThreshold = 1)
 summary(ov_thorax)
 ##Order based of padj
 ordered_ov_thorax <- ov_thorax[order(ov_thorax$padj),]
@@ -36,7 +36,7 @@ ordered_ov_thorax_table <- data.table(data.frame(ordered_ov_thorax), keep.rownam
 thorax <- subset(ordered_ov_thorax_table, padj < 0.05)
 
 ##venom ovaries 
-venom_ov <- results(mh_dds, contrast=c("Tissue", "Ovaries", "Venom"), alpha = 0.05, lfcThreshold = 1)
+venom_ov <- results(dds_tissue, contrast=c("Tissue", "Ovaries", "Venom"), alpha = 0.05, lfcThreshold = 1)
 summary(venom_ov)
 ##Order based of padj
 ordered_venom_ov <- venom_ov[order(venom_ov$padj),]

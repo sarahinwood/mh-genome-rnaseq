@@ -16,14 +16,12 @@ pepfile: 'data/config.yaml'
 all_samples = pep.sample_table['sample_name']
 
 #containers
-star_container = 'https://github.com/deardenlab/container-star/releases/download/0.0.1/container-star.2.7.9a.sif'
-bbduk_container = 'https://github.com/deardenlab/container-bbmap/releases/download/0.0.3/container-bbmap.bbmap_38.90.sif'
-tidyverse_container = 'docker://rocker/tidyverse:4.1.0'
+salmon_container = 'docker://combinelab/salmon:1.5.1'
 multiqc_container = 'docker://ewels/multiqc:1.9'
-kraken_container = 'docker://staphb/kraken2:2.1.2-no-db'
-trinity_container = 'docker://trinityrnaseq/trinityrnaseq:2.12.0'
-trinotate_container = 'shub://TomHarrop/trinotate_pipeline:v0.0.12'
-busco_container = 'docker://ezlabgva/busco:v5.2.1_cv1'
+bioconductor_container = 'library://sinwood/bioconductor/bioconductor_3.14:0.0.1'
+
+all_samples_minus_v2 = ["Mh_head1", "Mh_head2", "Mh_head3", "Mh_thorax1", "Mh_thorax2", "Mh_thorax3", "Mh_abdo1", "Mh_abdo2", "Mh_abdo3", 
+"Mh_ovary1", "Mh_ovary2", "Mh_ovary3", "Mh_venom1", "Mh_pupa1", "Mh_pupa2", "Mh_pupa3", "Mhyp_old_head", "Mhyp_old_abdo", "Mhyp_old_ovary1", "Mhyp_old_ovary2"]
 
 ###########
 ## RULES ##
@@ -31,309 +29,221 @@ busco_container = 'docker://ezlabgva/busco:v5.2.1_cv1'
 
 rule target:
     input:
-        'output/multiqc_filtermatch/multiqc_report.html',
-        'output/star/star_pass2/Mh_venom3.ReadsPerGene.out.tab',
-        expand('output/kraken_unmapped/reports/kraken_{sample}_report.txt', sample=all_samples),
-        expand('output/star/star_pass2/{sample}.ReadsPerGene.out.tab', sample=all_samples),
-        'output/Mh_annots.gtf',
-        'output/star/star_reference/Genome',
-        ##venom2 unmapped
-        'output/Mh_venom2_transcriptome/trinotate_Mh_venom2/trinotate/trinotate_annotation_report.txt',
-        'output/kraken_unmapped/reports/kraken_Mh_venom3_report.txt'
+        'output/04_multiqc/multiqc_report.html',
+        'output/05_deseq2/MhV1/stage_WT/sig_degs.csv',
+        'output/05_deseq2/MhV1/tissue_LRT/sig_degs.csv'
 
-###################################
-## what are unmapped reads from? ##
-###################################
+############
+## DESeq2 ##
+############
 
-rule trinotate_v2_unmapped:
+rule stage_WT:
     input:
-        fasta = 'output/Mh_venom2_transcriptome/trinity_Mh_venom2/Trinity.fasta',
-        blastdb = 'bin/trinotate_db/uniprot_sprot.pep',
-        hmmerdb = 'bin/trinotate_db/Pfam-A.hmm',
-        sqldb = 'bin/trinotate_db/Trinotate.sqlite'
+        MhV1_dds = 'output/05_deseq2/MhV1/MhV1_dds.rds'
     output:
-        'output/Mh_venom2_transcriptome/trinotate_Mh_venom2/trinotate/trinotate_annotation_report.txt',
-        'output/Mh_venom2_transcriptome/trinotate_Mh_venom2/trinotate/Trinotate.sqlite'
-    params:
-        wd = 'output/Mh_venom2_transcriptome/trinotate_Mh_venom2'
-    threads:
-        50
+        degs = 'output/05_deseq2/MhV1/stage_WT/sig_degs.csv'
     log:
-        'output/logs/trinotate.log'
+        'output/logs/stage_WT_MhV1.log'
     singularity:
-        trinotate_container
-    shell:
-        'trinotate_pipeline '
-        '--trinity_fasta {input.fasta} '
-        '--blast_db {input.blastdb} '
-        '--hmmer_db {input.hmmerdb} '
-        '--sqlite_db {input.sqldb} '
-        '--outdir {params.wd} '
-        '--threads {threads} '
-        '&> {log}'
+        bioconductor_container
+    script:
+        'src/stage_WT/stage_WT.R'
 
-rule Trinity_v2_unmapped:
+rule tissue_LRT:
     input:
-        r2 = 'output/star/star_pass2/Mh_venom2.Unmapped.out.mate1',
-        r1 = 'output/star/star_pass2/Mh_venom2.Unmapped.out.mate2',
+        MhV1_dds = 'output/05_deseq2/MhV1/MhV1_dds.rds'
     output:
-        'output/Mh_venom2_transcriptome/trinity/Trinity.fasta',
-        'output/Mh_venom2_transcriptome/trinity/Trinity.fasta.gene_trans_map'
-    params:
-        outdir = 'output/Mh_venom2_transcriptome/trinity'
-    singularity:
-        trinity_container
-    threads:
-        50
+        degs = 'output/05_deseq2/MhV1/tissue_LRT/sig_degs.csv'
     log:
-        'output/logs/trinity.log'
-    shell:
-        'Trinity '
-        '--SS_lib_type RF '
-        '--max_memory 300G '
-        '--CPU {threads} '
-        '--output {params.outdir} '
-        '--left {input.r1} '
-        '--right {input.r2} '
-        '--seqType fq '
-        '&> {log}'
+        'output/logs/tissue_LRT_MhV1.log'
+    singularity:
+        bioconductor_container
+    script:
+        'src/tissue_LRT/tissue_LRT.R'
 
-rule kraken_unmapped_v3:
+rule make_dds:
     input:
-        r1 = 'output/star/star_pass2/Mh_venom3.Unmapped.out.mate1',
-        r2 = 'output/star/star_pass2/Mh_venom3.Unmapped.out.mate2',
-        db = 'bin/db/kraken_std'
+        gene2tx_file = 'output/02_concat_Mh_MhV1_genomes/gene2tx.tsv',
+        salmon_output = expand('output/03_salmon/{sample}_quant/quant.sf', sample=all_samples),
+        sample_data_file = 'data/sample_table.csv'
     output:
-        out = 'output/kraken_unmapped/out/kraken_Mh_venom3_out.txt',
-        report = 'output/kraken_unmapped/reports/kraken_Mh_venom3_report.txt'
+        salmon_tpm = 'output/05_deseq2/salmon_tpm.csv',
+        all_dds = 'output/05_deseq2/Mh_MhV1_dds.rds',
+        Mh_dds = 'output/05_deseq2/Mh/Mh_dds.rds',
+        MhV1_dds = 'output/05_deseq2/MhV1/MhV1_dds.rds',
+        MhV1_heatmap = 'output/05_deseq2/MhV1/MhV1_heatmap.pdf'
     log:
-        'output/logs/kraken_unmapped/kraken_Mh_venom3.log'
-    threads:
-        20
+        'output/logs/deseq2/make_dds.log'
     singularity:
-        kraken_container
-    shell:
-        'kraken2 '
-        '--threads {threads} '
-        '--db {input.db} '
-        '--paired '
-        '--output {output.out} '
-        '--report {output.report} '
-        '--use-names '
-        '{input.r1} {input.r2} '
-        '&> {log}'
-
-##run kraken on unmapped reads from STAR - are unmapped reads something prokaryotic or unclassified?
-rule kraken_unmapped:
-    input:
-        r1 = 'output/star/star_pass2/{sample}.Unmapped.out.mate1',
-        r2 = 'output/star/star_pass2/{sample}.Unmapped.out.mate2',
-        db = 'bin/db/kraken_std'
-    output:
-        out = 'output/kraken_unmapped/out/kraken_{sample}_out.txt',
-        report = 'output/kraken_unmapped/reports/kraken_{sample}_report.txt'
-    log:
-        'output/logs/kraken_unmapped/kraken_{sample}.log'
-    threads:
-        20
-    singularity:
-        kraken_container
-    shell:
-        'kraken2 '
-        '--threads {threads} '
-        '--db {input.db} '
-        '--paired '
-        '--output {output.out} '
-        '--report {output.report} '
-        '--use-names '
-        '{input.r1} {input.r2} '
-        '&> {log}'
+        bioconductor_container
+    script:
+        'src/make_dds.R'
 
 #################
-## mapping etc ##
-#################
+## mapping etc ## mapping to hyp genome is terrible - can I even use this in paper because it might suggest bad annotations?
+################# doesn't display multiple sets of salmon results in one file
 
 rule multiqc:
     input:
-        expand('output/star_filtermatch/star_pass2/{sample}.ReadsPerGene.out.tab', sample=all_samples)
+        Mh_Mhv1 = expand('output/03_salmon/{sample}_quant/quant.sf', sample=all_samples),
+        Mhv1_only = expand('output/03_salmon_MhV1_only/{sample}_quant/quant.sf', sample=all_samples_minus_v2)
     output:
-        'output/multiqc_filtermatch/multiqc_report.html'
+        'output/04_multiqc/multiqc_report.html'
     params:
-        outdir = 'output/multiqc_filtermatch',
-        indirs = ['output/star_filtermatch/star_pass2', 'output/fastqc']
+        outdir = 'output/04_multiqc',
+        indirs = ['output/03_salmon/', 'output/03_salmon_MhV1_only']
     log:
         'output/logs/multiqc.log'
     container:
         multiqc_container
     shell:
         'multiqc '
+        '-f '
         '-o {params.outdir} '
         '{params.indirs} '
         '2> {log}'
 
-##index so can view in igv
-rule index_star_bam:
-    input:
-        bam = 'output/star_filtermatch/star_pass2/{sample}.Aligned.sortedByCoord.out.bam'
-    output:
-        bai = 'output/star_filtermatch/star_pass2/{sample}.Aligned.sortedByCoord.out.bam.bai'
-    threads:
-        20
-    log:
-        'output/logs/{sample}_index.log'
-    shell:
-        'samtools '
-        'index '
-        '{input.bam} '
+##########################
+## salmon quant Mh MhV1 ##
+##########################
 
-rule star_second_pass_v3:
+rule salmon_quant:
     input:
-        left = 'output/bbduk_trim/Mh_venom3_r1.fq.gz',
-        right = 'output/bbduk_trim/Mh_venom3_r2.fq.gz',
-        v3_junctions = 'output/star/star_pass1/Mh_venom3.SJ.out.tab',
-        junctions = expand('output/star/star_pass1/{sample}.SJ.out.tab', sample=all_samples)
+        index = 'output/03_salmon/transcripts_index/refseq.bin',
+        trimmed_r1 = 'output/bbduk_trim/{sample}_r1.fq.gz',
+        trimmed_r2 = 'output/bbduk_trim/{sample}_r2.fq.gz'
     output:
-        bam = 'output/star/star_pass2/Mh_venom3.Aligned.sortedByCoord.out.bam',
-        reads_per_gene = 'output/star/star_pass2/Mh_venom3.ReadsPerGene.out.tab',
-        unmapped = 'output/star/star_pass2/Mh_venom3.Unmapped.out.mate1'
+        quant = 'output/03_salmon/{sample}_quant/quant.sf'
+    params:
+        index_outdir = 'output/03_salmon/transcripts_index',
+        outdir = 'output/03_salmon/{sample}_quant'
     threads:
         20
-    params:
-        genome_dir = 'output/star/star_reference',
-        prefix = 'output/star/star_pass2/Mh_venom3.'
-    log:
-        'output/logs/star/star_pass2_Mh_venom3.log'
     singularity:
-        star_container
+        salmon_container
+    log:
+        'output/03_salmon/salmon_logs/salmon_quant_{sample}.log'
     shell:
-        'STAR '
-        '--runThreadN {threads} '
-        '--genomeDir {params.genome_dir} '
-        '--sjdbFileChrStartEnd {input.junctions} '
-        '--outSAMtype BAM SortedByCoordinate '
-        '--outBAMcompression 10 '
-        '--quantMode GeneCounts '
-        '--readFilesIn {input.left} {input.right} '
-        '--readFilesCommand zcat '
-        '--outFileNamePrefix {params.prefix} '
-        '--outReadsUnmapped Fastx '
+        'salmon quant '
+        '-i {params.index_outdir} '
+        '-l ISR '
+        '-1 {input.trimmed_r1} '
+        '-2 {input.trimmed_r2} '
+        '-o {params.outdir} '
+        '-p {threads} '
         '&> {log}'
 
-rule star_first_pass_v3:
+rule salmon_index:
     input:
-        left = 'output/bbduk_trim/Mh_venom3_r1.fq.gz',
-        right = 'output/bbduk_trim/Mh_venom3_r2.fq.gz',
-        star_reference = 'output/star/star_reference/Genome'
+        transcripts = 'output/02_concat_Mh_MhV1_genomes/Mh_MhV1_transcripts.fa'
     output:
-        sjdb = 'output/star/star_pass1/Mh_venom3.SJ.out.tab'
+        'output/03_salmon/transcripts_index/refseq.bin'
     params:
-        genome_dir = 'output/star/star_reference',
-        prefix = 'output/star/star_pass1/Mh_venom3.'
+        outdir = 'output/03_salmon/transcripts_index'
     threads:
         20
-    log:
-        'output/logs/star/star_pass1_Mh_venom3.log'
     singularity:
-        star_container
+        salmon_container
+    log:
+        'output/logs/salmon_index.log'
     shell:
-        'STAR '
-        '--runThreadN {threads} '
-        '--genomeDir {params.genome_dir} '
-        '--outSJfilterReads Unique '
-        '--outSAMtype None '
-        '--readFilesIn {input.left} {input.right} '
-        '--readFilesCommand zcat '
-        '--outFileNamePrefix {params.prefix} '
+        'salmon index '
+        '-t {input.transcripts} '
+        '-i {params.outdir} '
+        '-p {threads} '
         '&> {log}'
 
-rule star_second_pass:
+############################
+## salmon quant MhV1 only ##
+############################
+
+rule Mhv1_salmon_quant:
     input:
-        left = 'output/bbduk_trim/{sample}_r1.fq.gz',
-        right = 'output/bbduk_trim/{sample}_r2.fq.gz',
-        junctions = expand('output/star/star_pass1/{sample}.SJ.out.tab', sample=all_samples)
+        index = 'output/03_salmon_MhV1_only/transcripts_index/refseq.bin',
+        trimmed_r1 = 'output/bbduk_trim/{sample}_r1.fq.gz',
+        trimmed_r2 = 'output/bbduk_trim/{sample}_r2.fq.gz'
     output:
-        bam = 'output/star_filtermatch/star_pass2/{sample}.Aligned.sortedByCoord.out.bam',
-        reads_per_gene = 'output/star/star_pass2/{sample}.ReadsPerGene.out.tab',
-        unmapped = 'output/star/star_pass2/{sample}.Unmapped.out.mate1'
+        quant = 'output/03_salmon_MhV1_only/{sample}_quant/quant.sf'
+    params:
+        index_outdir = 'output/03_salmon_MhV1_only/transcripts_index',
+        outdir = 'output/03_salmon_MhV1_only/{sample}_quant'
     threads:
         20
-    params:
-        genome_dir = 'output/star/star_reference',
-        prefix = 'output/star/star_pass2/{sample}.'
-    log:
-        'output/logs/star_filtermatch/star_pass2_{sample}.log'
     singularity:
-        star_container
+        salmon_container
+    log:
+        'output/03_salmon_MhV1_only/salmon_logs/salmon_quant_{sample}.log'
     shell:
-        'STAR '
-        '--runThreadN {threads} '
-        '--genomeDir {params.genome_dir} '
-        '--sjdbFileChrStartEnd {input.junctions} '
-        '--outSAMtype BAM SortedByCoordinate '
-        '--outBAMcompression 10 '
-        '--quantMode GeneCounts '
-        '--readFilesIn {input.left} {input.right} '
-        '--readFilesCommand zcat '
-        '--outFileNamePrefix {params.prefix} '
-        '--outReadsUnmapped Fastx '
+        'salmon quant '
+        '-i {params.index_outdir} '
+        '-l ISR '
+        '-1 {input.trimmed_r1} '
+        '-2 {input.trimmed_r2} '
+        '-o {params.outdir} '
+        '-p {threads} '
         '&> {log}'
 
-rule star_first_pass:
+rule Mhv1_salmon_index:
     input:
-        left = 'output/bbduk_trim/{sample}_r1.fq.gz',
-        right = 'output/bbduk_trim/{sample}_r2.fq.gz',
-        star_reference = 'output/star/star_reference/Genome'
+        transcripts = 'data/MhV1_prodigal/renamed_nucleotide_seq.fasta'
     output:
-        sjdb = 'output/star/star_pass1/{sample}.SJ.out.tab'
+        'output/03_salmon_MhV1_only/transcripts_index/refseq.bin'
     params:
-        genome_dir = 'output/star/star_reference',
-        prefix = 'output/star/star_pass1/{sample}.'
+        outdir = 'output/03_salmon_MhV1_only/transcripts_index'
     threads:
         20
-    log:
-        'output/logs/star/star_pass1_{sample}.log'
     singularity:
-        star_container
+        salmon_container
+    log:
+        'output/logs/salmon_index_Mhv1_only.log'
     shell:
-        'STAR '
-        '--runThreadN {threads} '
-        '--genomeDir {params.genome_dir} '
-        '--outSJfilterReads Unique '
-        '--outSAMtype None '
-        '--readFilesIn {input.left} {input.right} '
-        '--readFilesCommand zcat '
-        '--outFileNamePrefix {params.prefix} '
+        'salmon index '
+        '-t {input.transcripts} '
+        '-i {params.outdir} '
+        '-p {threads} '
         '&> {log}'
 
-rule star_reference:
-    input:
-        mh_genome = 'data/final_microctonus_assemblies_annotations/Mh.scaffolds.fa',
-        gtf = 'output/Mh_annots.gtf'
-    output:
-        'output/star/star_reference/Genome'
-    params:
-        genome_dir = 'output/star/star_reference'
-    threads:
-        20
-    log:
-        'output/logs/star/star_reference.log'
-    singularity:
-    	star_container
-    shell:
-        'STAR '
-        '--runThreadN {threads} '
-        '--runMode genomeGenerate '
-        '--genomeSAindexNbases 12 '
-        '--genomeDir {params.genome_dir} '
-        '--genomeFastaFiles {input.mh_genome} '
-        '--sjdbGTFfile {input.gtf} '
-        '2> {log} '
+####################
+## concat genomes ##
+####################
 
-rule convert_gff_to_gtf:
+rule concat_Mh_MhV1_genomes:
     input:
-        'output/mh_genome_viral.gff3'
+        Mh_genome = 'data/final_microctonus_assemblies_annotations/Mh.scaffolds.virus_removed.fa',
+        Mhv1_genome = 'data/MhV1_genome.fa',
+        Mh_gtf = 'output/01_gtfs/Mh_annots.gtf',
+        Mhv1_gtf = 'output/01_gtfs/MhV1_gene_predictions.gtf',
+        Mh_transcripts = 'data/final_microctonus_assemblies_annotations/Mh.mrna-transcripts.virus_removed.fa',
+        Mhv1_transcripts = 'data/MhV1_prodigal/renamed_nucleotide_seq.fasta'
     output:
-        'output/Mh_annots.gtf'
+        genome_concat = 'output/02_concat_Mh_MhFV_genomes/Mh_MhFV.fa',
+        gtf_concat = 'output/02_concat_Mh_MhFV_genomes/Mh_MhFV.gtf',
+        transcripts_concat = 'output/02_concat_Mh_MhFV_genomes/Mh_MhFV_transcripts.fa'
+    shell:
+        'cat {input.Mh_genome} {input.Mhv1_genome} > {output.genome_concat} & '
+        'cat {input.Mh_gtf} {input.Mhv1_gtf} > {output.gtf_concat} & '
+        'cat {input.Mh_transcripts} {input.Mhv1_transcripts} > {output.transcripts_concat} & ' 
+        'wait'
+
+rule convert_MhV1_gff_to_gtf:
+    input:
+        'data/MhV1_prodigal/renamed_gene_predictions.gff'
+    output:
+        'output/01_gtfs/MhFV_gene_predictions.gtf'
+    log:
+        'output/logs/convert_MhV1_gff_to_gtf.log'
+    shell:
+        'gffread '
+        '{input} '
+        '-T '
+        '-o {output} '
+        '&> {log}'
+
+rule convert_Mh_gff_to_gtf:
+    input:
+        'data/final_microctonus_assemblies_annotations/Mh.gff3.virus_removed.gff3'
+    output:
+        'output/01_gtfs/Mh_annots.gtf'
     log:
         'output/logs/convert_gff_to_gtf.log'
     shell:

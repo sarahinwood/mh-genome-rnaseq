@@ -2,14 +2,14 @@ library(data.table)
 library(DESeq2)
 library(VennDiagram)
 
-mh_dds <- readRDS("output/deseq2/itWT/mh_itWT.rds")
+dds_tissue <- readRDS("output/deseq2/itWT/mh_itWT.rds")
 
 ###############################
 ## iterative pairwise comp.s ##
 ###############################
 
 ##thorax head
-thorax_head <- results(mh_dds, contrast=c("Tissue", "Thorax", "Head"), alpha = 0.05, lfcThreshold = 1)
+thorax_head <- results(dds_tissue, contrast=c("Tissue", "Thorax", "Head"), alpha = 0.05, lfcThreshold = 1)
 summary(thorax_head)
 ##Order based of padj
 ordered_thorax_head <- thorax_head[order(thorax_head$padj),]
@@ -18,7 +18,7 @@ ordered_thorax_head_table <- data.table(data.frame(ordered_thorax_head), keep.ro
 head <- subset(ordered_thorax_head_table, padj < 0.05)
 
 ##thorax abdo
-thorax_abdo <- results(mh_dds, contrast=c("Tissue", "Thorax", "Abdomen"), alpha = 0.05, lfcThreshold = 1)
+thorax_abdo <- results(dds_tissue, contrast=c("Tissue", "Thorax", "Abdomen"), alpha = 0.05, lfcThreshold = 1)
 summary(thorax_abdo)
 ##Order based of padj
 ordered_thorax_abdo <- thorax_abdo[order(thorax_abdo$padj),]
@@ -27,7 +27,7 @@ ordered_thorax_abdo_table <- data.table(data.frame(ordered_thorax_abdo), keep.ro
 abdo <- subset(ordered_thorax_abdo_table, padj < 0.05)
 
 ##thorax venom
-thorax_venom <- results(mh_dds, contrast=c("Tissue", "Thorax", "Venom"), alpha = 0.05, lfcThreshold = 1)
+thorax_venom <- results(dds_tissue, contrast=c("Tissue", "Thorax", "Venom"), alpha = 0.05, lfcThreshold = 1)
 summary(thorax_venom)
 ##Order based of padj
 ordered_thorax_venom <- thorax_venom[order(thorax_venom$padj),]
@@ -36,7 +36,7 @@ ordered_thorax_venom_table <- data.table(data.frame(ordered_thorax_venom), keep.
 venom <- subset(ordered_thorax_venom_table, padj < 0.05)
 
 ##thorax ovaries 
-thorax_ovaries <- results(mh_dds, contrast=c("Tissue", "Thorax", "Ovaries"), alpha = 0.05, lfcThreshold = 1)
+thorax_ovaries <- results(dds_tissue, contrast=c("Tissue", "Thorax", "Ovaries"), alpha = 0.05, lfcThreshold = 1)
 summary(thorax_ovaries)
 ##Order based of padj
 ordered_thorax_ovaries <- thorax_ovaries[order(thorax_ovaries$padj),]
